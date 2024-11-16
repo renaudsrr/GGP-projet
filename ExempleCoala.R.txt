@@ -1,0 +1,77 @@
+# Sylvain Glémin 2023
+# Projet GPP - Utilisation de coala et quelques pistes pour l'analyse de données
+library(coala)
+library(ape)
+
+# Définition du modèle standard
+# J'ai mis 2 pour la ploidie ici pour coller aux données mais ça ne change rien sur les simulations
+# La seule chose est que le nombre total de séquence échantillonnée est ploidy x sample_size (donc 20 dans mon example)
+# Attention tout est normalisé par la taille actuelle, N0
+model <- coal_model(sample_size = 10,loci_number = 1000,loci_length = 1000,ploidy = 2)
+# Specification du taux de mutation rate = 4 x N0 X u 
+# A noter qu'i s'agit de la valeur pour l'ensemble du locus donc à diviser par loci_length pour avoir la valeur par site
+model <- model + feat_mutation(rate = 1)
+# Ajout d'un scénario avec des changements de tailles de pop= time en N0 génération, new_size produit de N0
+# Exemple: il y a plus de 1xN0 dans le passé la taille était 5xN0 puis a N0 elle est passé à 0.1xN0 puis au temps 0.5xN0 elle es passée à N0) 
+model <- model + feat_size_change(new_size = 1,time = 1) + feat_size_change(new_size = 0.1,time = 0.5)
+# Ajout des stat résumé
+model <- model + sumstat_tajimas_d(name = "Dtaj") + sumstat_nucleotide_div(name = "pi") + sumstat_seg_sites(name = "Sn")
+
+model <- model + sumstat_trees()
+
+# Simulation du modèle
+sim <- simulate(model,seed = 12)
+
+plot(read.tree(text = sim$tress[[1]]))
+
+# Pour récupérer les stats résumé: immédiat pour pi et Dtaj
+mean(sim$pi,na.rm=T)
+hist(sim$pi)
+mean(sim$Dtaj,na.rm=T)
+hist(sim$Dtaj)
+# Pour Sn c'est plus embêtant car c'est une matrice avec la position de chaque site et les allèles des individus (0 ou 1)
+# Il faut faire l'appel de la façon suivante
+sim$Sn[1][[1]]
+sim$Sn[2][[1]]
+# etc...
+# Pour avoir le nombre de sites polymorphes, il faut prendre
+dim(sim$Sn[1][[1]])[[2]]
+
+
+
+# Un exemple avec deux populations
+
+# Pour sample size on donne donc un vecteur avec deux valeurs pour les deux populations (pas nécessairement égales)
+model <- coal_model(sample_size = c(10,8),loci_number = 1000,loci_length = 1000,ploidy = 2)
+model <- model + feat_mutation(rate = 1)
+# Ajout d'un évenement de spéciation = fusion de populations en remontant le temps
+model <- model + feat_pop_merge(time = 1,pop_source = 1,pop_target = 2)
+model <- model + feat_migration(rate = 1,symmetric = T,time = 1) # migration symetrique depuis le time split
+# Ajout des statistiques résumés
+model <- model +
+  sumstat_nucleotide_div(name = "pi1",population = 1) +
+  sumstat_nucleotide_div(name = "pi2",population = 2) +
+  sumstat_nucleotide_div(name = "pitot",population = "all")
+
+
+
+for (migration_rate in c(0,1,5,10,50)) {
+  model <- coal_model(sample_size = c(100,80),loci_number = 100,loci_length = 100, ploidy = 2) + 
+    feat_mutation(rate = 1) + 
+    feat_pop_merge(time = 1, pop_source = 1, pop_target = 2) + 
+    feat_migration(rate = migration_rate, symmetric = T, time = 1) +
+    sumstat_nucleotide_div(name = "pi1", population = 1) +
+    sumstat_nucleotide_div(name = "pi2", population = 2) +
+    sumstat_nucleotide_div(name = "pitot", population = "all")
+  sim$fst <- 1- (sim$pi1+sim$pi2)/(2*sim$pitot)
+  sim <- simulate(model)
+  print(mean(sim$fst))
+}
+
+
+# Simulation du modèle
+sim <- simulate(model,seed = 1)
+# calcule du Fst à partir des pi: Fst = 1 - mean(pi1,pi2) / pitot
+sim$fst <- 1- (sim$pi1+sim$pi2)/(2*sim$pitot)
+hist(sim$fst)
+plot(sim$pitot,sim$fst)
