@@ -6,6 +6,8 @@ cat("\014")
 
 library(coala)  # pour créer des modèles de coalescence
 library(ape)    # pour manipuler et visualiser les arbres phylogénétiques
+library(glue)
+
 
 
 # Définition du modèle de coalescence
@@ -21,7 +23,7 @@ model <- model + feat_mutation(rate = 1)  # Taux de mutation global pour chaque 
 
 # Changement de taille de la population à différents moments dans le temps
 # Exemple : taille passée 5xN0, puis 0.1xN0, et enfin à N0
-model <- model + 
+model <- model +
   feat_size_change(new_size = 1, time = 1) +    # Taille de la population à 1xN0 à t=1
   feat_size_change(new_size = 0.1, time = 0.5)  # Taille de la population à 0.1xN0 à t=0.5
 
@@ -34,17 +36,21 @@ model <- model +
 model <- model + sumstat_trees()
 
 # Simulation du modèle
-sim <- simulate(model, seed = 12)
+sim <- simulate(model)
+                #, seed = 12)
 
 # Lecture et visualisation de l'arbre phylogénétique simulé
 tree <- read.tree(text = sim$trees[[1]])
 plot(tree)                             # Visualisation de l'arbre phylogénétique
 
 # Calcul des statistiques résumées pour pi et Dtaj
-mean(sim$pi, na.rm = TRUE)   # Moyenne de la diversité nucléotidique (pi)
-hist(sim$pi)                 # Histogramme de la diversité nucléotidique
-mean(sim$Dtaj, na.rm = TRUE) # Moyenne de Tajima's D
-hist(sim$Dtaj)               # Histogramme de Tajima's D
+mean_pi = mean(sim$pi, na.rm = TRUE)   # Moyenne de la diversité nucléotidique (pi)
+hist(sim$pi, main = glue("mean = {mean_pi}"),xlab="pi") # Histogramme de la diversité nucléotidique
+abline(v=mean_pi,col = "red")
+
+mean_Dtaj = mean(sim$Dtaj, na.rm = TRUE) # Moyenne de Tajima's D
+hist(sim$Dtaj, main = glue("mean = {mean_Dtaj}"),xlab="Dtaj") # Histogramme de Tajima's D
+abline(v=mean_Dtaj,col = "red")
 
 # Accès aux sites polymorphes dans Sn
 sim$Sn[1][[1]]  # Premier site polymorphe
@@ -52,7 +58,6 @@ sim$Sn[2][[1]]  # Deuxième site polymorphe
 
 # Nombre de sites polymorphes : obtenir la dimension de chaque matrice de sites
 dim(sim$Sn[1][[1]])[[2]]  # Nombre de sites polymorphes (colonnes) dans le premier locus
-
 
 rm(list=ls())  
 cat("\014")
